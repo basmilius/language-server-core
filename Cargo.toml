@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["crates/text"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "FSL-1.1-MIT"
+repository = "https://github.com/basmilius/language-server-core"
+
+[workspace.dependencies]
+crossbeam-channel = "0.5.17"
+lsp-server = "0.10.0"
+lsp-types = "0.97.0"
+rowan = "0.17.0"
+serde = "1.0.229"
+serde_json = "1.0.151"
+text-size = "1.1.1"
+lsc-text = { version = "0.1.0", path = "crates/text" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 1
