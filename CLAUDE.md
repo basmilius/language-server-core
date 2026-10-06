@@ -43,7 +43,7 @@ lsc-syntax = { path = "../core/crates/syntax" }
 lsc-text = { path = "../core/crates/text" }
 ```
 
-The paths are relative to the server's folder. While the patch is there, Cargo rewrites the core's entries in the server's `Cargo.lock` to the local paths, so run the checks without `--locked` and do not commit `Cargo.lock`. To go back, remove the file and run `cargo update -p lsc-server -p lsc-syntax -p lsc-text`, which puts the pinned tag back in the lock. For a single command, the same patch fits on the command line:
+The paths are relative to the server's folder. While the patch is there, Cargo rewrites the core's entries in the server's `Cargo.lock` to the local paths, so run the checks without `--locked` and do not commit `Cargo.lock`. To go back, remove the file: the next Cargo command without `--locked` puts the pinned tag back in the lock, and `git diff Cargo.lock` is empty again. For a single command, the same patch fits on the command line:
 
 ```sh
 cargo --config 'patch."https://github.com/basmilius/language-server-core".lsc-text.path="../core/crates/text"' test
