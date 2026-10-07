@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/text", "crates/syntax", "crates/server"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 license = "FSL-1.1-MIT"
@@ -17,7 +17,7 @@ rowan = "0.17.0"
 serde = "1.0.229"
 serde_json = "1.0.151"
 text-size = "1.1.1"
-lsc-text = { version = "0.1.0", path = "crates/text" }
+lsc-text = { version = "0.1.1", path = "crates/text" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

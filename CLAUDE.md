@@ -10,7 +10,7 @@ The shared foundation of the language servers in Rust: line index and position e
 A server depends on it through Git pinned to a tag, never through crates.io and never on a branch:
 
 ```toml
-lsc-server = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.0" }
+lsc-server = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.1" }
 ```
 
 ## What belongs here

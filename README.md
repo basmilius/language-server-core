@@ -16,9 +16,9 @@ The shared foundation of the language servers of `basmilius/language-server-*`, 
 
 ```toml
 [workspace.dependencies]
-lsc-server = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.0" }
-lsc-syntax = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.0" }
-lsc-text = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.0" }
+lsc-server = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.1" }
+lsc-syntax = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.1" }
+lsc-text = { git = "https://github.com/basmilius/language-server-core", tag = "v0.1.1" }
 ```
 
 A parser implements `TokenKind` for its kinds and drives `lsc_syntax::Parser`:
