@@ -390,6 +390,24 @@ where
         self.fuel.set(FUEL);
     }
 
+    /// Consumes the current token into the tree as `kind`, for a word whose meaning the grammar
+    /// decides: a keyword used as a name, or a name used as a keyword.
+    pub fn bump_remap(&mut self, kind: L::Kind) {
+        if self.cursor >= self.significant.len() {
+            return;
+        }
+        self.flush_trivia();
+        let index = self.emitted;
+        let start = self.starts[index] as usize;
+        self.builder.token(
+            L::kind_to_raw(kind),
+            &self.text[start..start + self.tokens[index].len as usize],
+        );
+        self.emitted += 1;
+        self.cursor += 1;
+        self.fuel.set(FUEL);
+    }
+
     pub fn eat(&mut self, kind: L::Kind) -> bool {
         if self.at(kind) {
             self.bump();

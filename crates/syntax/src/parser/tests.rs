@@ -470,3 +470,32 @@ fn a_parse_clones_and_prints() {
     assert_eq!(copy.errors(), parse.errors());
     assert!(format!("{parse:?}").contains("';' expected"));
 }
+
+#[test]
+fn bump_remap_puts_the_token_in_the_tree_as_another_kind() {
+    let text = "let let = 1;";
+    let mut p = P::new(text, lex(text));
+    p.start_root(ROOT);
+    p.start(LET);
+    p.bump();
+    assert_eq!(p.current(), LET_KW);
+    p.bump_remap(IDENT);
+    assert_eq!(p.current(), EQ);
+    p.bump();
+    expr(&mut p);
+    p.expect(SEMICOLON, "';'");
+    p.finish_node();
+    p.bump_remap(IDENT);
+    p.flush_rest();
+    p.finish_node();
+    let parse = p.finish();
+    let kinds: Vec<Kind> = parse
+        .syntax()
+        .descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .filter(|token| !token.kind().is_trivia())
+        .map(|token| token.kind())
+        .collect();
+    assert_eq!(kinds, [LET_KW, IDENT, EQ, NUMBER, SEMICOLON]);
+    assert_eq!(parse.syntax().to_string(), text);
+}

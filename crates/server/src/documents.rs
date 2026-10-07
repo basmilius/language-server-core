@@ -45,6 +45,12 @@ impl<P, S> Document<P, S> {
         self.parsed.as_ref()
     }
 
+    /// Forgets the tree, so the next [`Self::parse_with`] parses again: for a server whose tree
+    /// depends on a setting of the document besides its text.
+    pub fn invalidate(&mut self) {
+        self.parsed = None;
+    }
+
     pub fn mapper(&self, encoding: PositionEncoding) -> Mapper<'_> {
         Mapper {
             text: &self.text,
@@ -249,6 +255,21 @@ mod tests {
         let mut document = Plain::new(1, "abcdef".to_string());
         document.apply_changes(2, &[change((0, 4), (0, 1), "-")], PositionEncoding::Utf16);
         assert_eq!(document.text, "a-ef");
+    }
+
+    #[test]
+    fn invalidating_parses_the_same_text_again() {
+        let mut document = Plain::new(1, "abc".to_string());
+        assert_eq!(*document.parse_with(str::len), 3);
+        assert_eq!(
+            *document.parse_with(|_| 0),
+            3,
+            "the tree is kept until something changes"
+        );
+        document.invalidate();
+        assert!(document.cached().is_none());
+        assert_eq!(*document.parse_with(|_| 7), 7);
+        assert_eq!(document.text, "abc");
     }
 
     #[test]
