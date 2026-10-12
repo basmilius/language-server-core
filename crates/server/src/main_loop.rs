@@ -24,8 +24,9 @@ pub trait Handler {
 
     fn event(&mut self, event: Self::Event) -> Result<(), BoxError>;
 
-    /// Runs once the client has nothing more queued, so that work which follows from a change
-    /// (diagnostics, say) is done once per burst of keystrokes and not once per keystroke.
+    /// Runs once the client has nothing more queued, or the background work nothing more to say,
+    /// so that work which follows from a change (diagnostics, say) is done once per burst of
+    /// keystrokes or events and not once per keystroke.
     fn idle(&mut self) -> Result<(), BoxError> {
         Ok(())
     }
@@ -56,7 +57,13 @@ pub fn main_loop<H: Handler>(
                 handler.idle()?;
             }
             recv(events) -> event => match event {
-                Ok(event) => handler.event(event)?,
+                Ok(event) => {
+                    handler.event(event)?;
+                    while let Ok(event) = events.try_recv() {
+                        handler.event(event)?;
+                    }
+                    handler.idle()?;
+                }
                 // With every sender gone the channel would be ready forever and spin the loop.
                 Err(_) => events = crossbeam_channel::never(),
             }
@@ -207,9 +214,9 @@ mod tests {
             main_loop(&server, &events, &mut recorder).expect("runs to the end");
             recorder.seen
         });
-        wait_for(&echo, "event 8");
+        wait_for(&echo, "idle");
         drop(client);
-        assert_eq!(thread.join().expect("no panic"), ["event 7", "event 8"]);
+        assert_eq!(thread.join().expect("no panic"), ["event 7", "event 8", "idle"]);
     }
 
     #[test]
@@ -227,13 +234,13 @@ mod tests {
             main_loop(&server, &events, &mut recorder).expect("runs to the end");
             recorder.seen
         });
-        wait_for(&echo, "event 1");
+        wait_for(&echo, "idle");
         client.sender.send(notification("initialized")).expect("sent");
         wait_for(&echo, "idle");
         drop(client);
         assert_eq!(
             thread.join().expect("no panic"),
-            ["event 1", "notification initialized", "idle"]
+            ["event 1", "idle", "notification initialized", "idle"]
         );
     }
 

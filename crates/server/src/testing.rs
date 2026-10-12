@@ -199,8 +199,12 @@ mod tests {
         encoding: PositionEncoding,
         progress: Progress,
         dirty: Vec<Uri>,
+        opened: Option<Uri>,
         jobs: Sender<u32>,
     }
+
+    /// The job whose event marks the last opened document dirty, as the end of an index would.
+    const REFRESH: u32 = 2;
 
     fn words(text: &str) -> Vec<(u32, u32)> {
         let mut found = Vec::new();
@@ -254,6 +258,7 @@ mod tests {
                     let params: DidOpenTextDocumentParams = serde_json::from_value(notification.params)?;
                     let item = params.text_document;
                     self.documents.open(item.uri.clone(), item.version, item.text);
+                    self.opened = Some(item.uri.clone());
                     self.dirty.push(item.uri);
                     self.progress.job_started(&mut self.client);
                     self.jobs.send(1)?;
@@ -266,6 +271,7 @@ mod tests {
                         self.dirty.push(uri);
                     }
                 }
+                "words/refresh" => self.jobs.send(REFRESH)?,
                 _ => {}
             }
             Ok(())
@@ -277,6 +283,10 @@ mod tests {
         }
 
         fn event(&mut self, files: u32) -> Result<(), BoxError> {
+            if files == REFRESH {
+                self.dirty.extend(self.opened.clone());
+                return Ok(());
+            }
             self.progress.job_progress(&self.client, files as usize, files as usize);
             self.progress.job_finished(&self.client);
             Ok(())
@@ -347,6 +357,7 @@ mod tests {
                 },
             ),
             dirty: Vec::new(),
+            opened: None,
             jobs,
         };
         main_loop(&connection, &events, &mut server)
@@ -391,6 +402,16 @@ mod tests {
                 .request_error("textDocument/hover", json!({ "nonsense": 1 }))
                 .contains("missing field")
         );
+        client.shutdown();
+    }
+
+    #[test]
+    fn publishes_what_an_event_of_the_server_marked_dirty() {
+        let (mut client, _) = start(json!({}));
+        client.open_document(URI, "plaintext", "bad");
+        assert_eq!(client.diagnostics(URI).len(), 1);
+        client.notify("words/refresh", Value::Null);
+        assert_eq!(client.diagnostics(URI).len(), 1);
         client.shutdown();
     }
 
