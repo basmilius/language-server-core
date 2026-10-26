@@ -12,6 +12,7 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     // `file://host/path` has a host; the empty host is the usual case.
     let path = rest.find('/').map_or("", |index| &rest[index..]);
     let decoded = percent_decode(path)?;
+
     Some(PathBuf::from(decoded))
 }
 
@@ -20,6 +21,7 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
 pub fn path_to_uri(path: &Path) -> Option<Uri> {
     let text = path.to_str()?;
     let mut out = String::from("file://");
+
     for byte in text.bytes() {
         match byte {
             b'A'..=b'Z'
@@ -47,6 +49,7 @@ pub fn path_to_uri(path: &Path) -> Option<Uri> {
             other => out.push_str(&format!("%{other:02X}")),
         }
     }
+
     Uri::from_str(&out).ok()
 }
 
@@ -54,6 +57,7 @@ fn percent_decode(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;
+
     while index < bytes.len() {
         if bytes[index] == b'%' {
             let hex = text.get(index + 1..index + 3)?;
@@ -64,6 +68,7 @@ fn percent_decode(text: &str) -> Option<String> {
             index += 1;
         }
     }
+
     String::from_utf8(out).ok()
 }
 
@@ -95,6 +100,7 @@ mod tests {
             "/back\\slash/and\"quote",
             "/",
         ];
+
         for text in paths {
             let path = PathBuf::from(text);
             let uri = path_to_uri(&path).expect("a uri");
@@ -122,6 +128,7 @@ mod tests {
             uri_to_path(&uri("file://server/share/x.php")).expect("a path"),
             PathBuf::from("/share/x.php")
         );
+
         assert_eq!(uri_to_path(&uri("file://server")).expect("a path"), PathBuf::from(""));
     }
 

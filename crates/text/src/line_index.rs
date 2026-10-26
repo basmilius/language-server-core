@@ -29,14 +29,17 @@ impl LineIndex {
         let mut line_starts = vec![0];
         let bytes = text.as_bytes();
         let mut index = 0;
+
         while index < bytes.len() {
             match bytes[index] {
                 b'\n' => line_starts.push(index as u32 + 1),
                 b'\r' if bytes.get(index + 1) != Some(&b'\n') => line_starts.push(index as u32 + 1),
                 _ => {}
             }
+
             index += 1;
         }
+
         LineIndex {
             line_starts,
             len: text.len() as u32,
@@ -65,6 +68,7 @@ impl LineIndex {
         let offset = u32::from(offset).min(self.len);
         let line = self.line_of(offset);
         let start = self.line_start(line);
+
         let col = match encoding {
             PositionEncoding::Utf8 => offset - start,
             PositionEncoding::Utf16 => text[start as usize..offset as usize]
@@ -73,6 +77,7 @@ impl LineIndex {
                 .sum(),
             PositionEncoding::Utf32 => text[start as usize..offset as usize].chars().count() as u32,
         };
+
         LineCol { line, col }
     }
 
@@ -83,24 +88,29 @@ impl LineIndex {
         if position.line >= self.line_count() {
             return TextSize::from(self.len);
         }
+
         let start = self.line_start(position.line) as usize;
         let end = self.line_start(position.line + 1) as usize;
         let line = &text[start..end];
         let line_without_break = line.trim_end_matches(['\n', '\r']);
         let mut remaining = position.col;
         let mut offset = 0usize;
+
         for character in line_without_break.chars() {
             let width = match encoding {
                 PositionEncoding::Utf8 => character.len_utf8() as u32,
                 PositionEncoding::Utf16 => character.len_utf16() as u32,
                 PositionEncoding::Utf32 => 1,
             };
+
             if remaining < width {
                 break;
             }
+
             remaining -= width;
             offset += character.len_utf8();
         }
+
         TextSize::from((start + offset) as u32)
     }
 
@@ -143,6 +153,7 @@ mod tests {
         assert_eq!(utf8.col, 1 + 2 + 4);
         let utf32 = index.line_col(text, after_emoji, PositionEncoding::Utf32);
         assert_eq!(utf32.col, 3);
+
         for encoding in ENCODINGS {
             let position = index.line_col(text, after_emoji, encoding);
             assert_eq!(index.offset(text, position, encoding), after_emoji);
@@ -153,14 +164,18 @@ mod tests {
     fn every_character_boundary_round_trips_in_every_encoding() {
         let text = "\u{1f600}a\r\n\u{e9}\u{10348}\rb\n\n\u{4e2d}\u{1f468}\u{200d}\u{1f469}z";
         let index = LineIndex::new(text);
+
         for (offset, _) in text.char_indices().chain([(text.len(), ' ')]) {
             // No position names the point between the two characters of a CRLF.
             if text[..offset].ends_with('\r') && text[offset..].starts_with('\n') {
                 continue;
             }
+
             let offset = TextSize::from(offset as u32);
+
             for encoding in ENCODINGS {
                 let position = index.line_col(text, offset, encoding);
+
                 assert_eq!(
                     index.offset(text, position, encoding),
                     offset,
@@ -197,6 +212,7 @@ mod tests {
         assert_eq!(index.line_count(), 3);
         assert_eq!(index.line_start(1), 4);
         assert_eq!(index.line_start(2), 8);
+
         for encoding in ENCODINGS {
             assert_eq!(index.offset(text, at(0, 99), encoding), TextSize::from(2));
             assert_eq!(index.offset(text, at(1, 2), encoding), TextSize::from(6));
@@ -208,10 +224,12 @@ mod tests {
     fn the_carriage_return_of_a_crlf_belongs_to_its_line() {
         let text = "ab\r\ncd";
         let index = LineIndex::new(text);
+
         assert_eq!(
             index.line_col(text, TextSize::from(3), PositionEncoding::Utf16),
             at(0, 3)
         );
+
         assert_eq!(index.line_of(3), 0);
         assert_eq!(index.line_of(4), 1);
     }
@@ -221,10 +239,12 @@ mod tests {
         let text = "a\rb\r\nc";
         let index = LineIndex::new(text);
         assert_eq!(index.line_count(), 3);
+
         assert_eq!(
             index.line_col(text, offset_of(text, "b"), PositionEncoding::Utf16),
             at(1, 0)
         );
+
         assert_eq!(
             index.offset(text, at(2, 0), PositionEncoding::Utf16),
             offset_of(text, "c")
@@ -235,15 +255,19 @@ mod tests {
     fn clamps_positions_past_the_end() {
         let text = "ab\ncd";
         let index = LineIndex::new(text);
+
         assert_eq!(
             index.offset(text, at(0, 99), PositionEncoding::Utf16),
             TextSize::from(2)
         );
+
         assert_eq!(index.offset(text, at(9, 0), PositionEncoding::Utf16), TextSize::from(5));
+
         assert_eq!(
             index.offset(text, at(1, 99), PositionEncoding::Utf16),
             TextSize::from(5)
         );
+
         assert_eq!(
             index.line_col(text, TextSize::from(99), PositionEncoding::Utf16),
             at(1, 2)
@@ -255,10 +279,12 @@ mod tests {
         let text = "a\n";
         let index = LineIndex::new(text);
         assert_eq!(index.line_count(), 2);
+
         assert_eq!(
             index.line_col(text, TextSize::from(2), PositionEncoding::Utf16),
             at(1, 0)
         );
+
         assert_eq!(index.offset(text, at(1, 0), PositionEncoding::Utf16), TextSize::from(2));
     }
 

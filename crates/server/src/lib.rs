@@ -11,6 +11,7 @@ mod main_loop;
 pub mod paths;
 mod progress;
 mod stdio;
+
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

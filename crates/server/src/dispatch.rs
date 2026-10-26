@@ -59,6 +59,7 @@ mod tests {
 
     fn error(response: Response) -> (i32, String) {
         let error = response.response_result.expect_err("an error");
+
         (error.code, error.message)
     }
 
@@ -67,7 +68,9 @@ mod tests {
         let response = answer(RequestId::from(7), params(), |params: TextDocumentPositionParams| {
             Some(params.position)
         });
+
         assert_eq!(response.id, RequestId::from(7));
+
         assert_eq!(
             response.response_result.expect("a result"),
             json!({ "line": 1, "character": 2 })
@@ -79,6 +82,7 @@ mod tests {
         let response = answer(RequestId::from(1), params(), |_: TextDocumentPositionParams| {
             None::<Position>
         });
+
         assert_eq!(response.response_result.expect("a result"), Value::Null);
     }
 
@@ -89,14 +93,17 @@ mod tests {
             json!({ "nope": true }),
             |_: TextDocumentPositionParams| -> Option<()> { panic!("not run") },
         );
+
         let (code, message) = error(response);
         assert_eq!(code, ErrorCode::InvalidParams as i32);
         assert!(message.contains("textDocument"), "{message}");
+
         let response = answer_checked(
             RequestId::from(1),
             json!(3),
             |_: TextDocumentPositionParams| -> Result<Option<()>, String> { panic!("not run") },
         );
+
         assert_eq!(error(response).0, ErrorCode::InvalidParams as i32);
     }
 
@@ -105,13 +112,16 @@ mod tests {
         let response = answer_checked(RequestId::from(2), params(), |_: TextDocumentPositionParams| {
             Err::<Option<()>, _>("Cannot rename this".to_string())
         });
+
         assert_eq!(
             error(response),
             (ErrorCode::RequestFailed as i32, "Cannot rename this".to_string())
         );
+
         let response = answer_checked(RequestId::from(2), params(), |params: TextDocumentPositionParams| {
             Ok(Some(params.position.line))
         });
+
         assert_eq!(response.response_result.expect("a result"), json!(1));
     }
 

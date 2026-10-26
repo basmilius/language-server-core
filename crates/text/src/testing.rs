@@ -11,6 +11,7 @@ pub const CURSOR: &str = "$0";
 /// When the text holds no cursor, which is a mistake in the test.
 pub fn cursor(text: &str) -> (u32, String) {
     let offset = text.find(CURSOR).expect("the text holds a cursor marker");
+
     (offset as u32, text.replacen(CURSOR, "", 1))
 }
 

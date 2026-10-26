@@ -19,6 +19,7 @@ pub trait Handler {
     /// The answer to a request the server sent.
     fn response(&mut self, response: Response) -> Result<(), BoxError> {
         let _ = response;
+
         Ok(())
     }
 
@@ -40,6 +41,7 @@ pub fn main_loop<H: Handler>(
     handler: &mut H,
 ) -> Result<(), BoxError> {
     let mut events = events.clone();
+
     loop {
         select! {
             recv(connection.receiver) -> message => {
@@ -78,11 +80,13 @@ fn handle<H: Handler>(connection: &Connection, handler: &mut H, message: Message
             if connection.handle_shutdown(&request)? {
                 return Ok(true);
             }
+
             handler.request(request)?;
         }
         Message::Notification(notification) => handler.notification(notification)?,
         Message::Response(response) => handler.response(response)?,
     }
+
     Ok(false)
 }
 
@@ -106,6 +110,7 @@ mod tests {
             if let Some(echo) = &self.echo {
                 let _ = echo.send(line.clone());
             }
+
             self.seen.push(line);
         }
     }
@@ -115,29 +120,35 @@ mod tests {
 
         fn request(&mut self, request: Request) -> Result<(), BoxError> {
             self.saw(format!("request {}", request.method));
+
             if self.fail_on == Some(request.method.as_str()) {
                 return Err("failed".into());
             }
+
             Ok(())
         }
 
         fn notification(&mut self, notification: Notification) -> Result<(), BoxError> {
             self.saw(format!("notification {}", notification.method));
+
             Ok(())
         }
 
         fn response(&mut self, response: Response) -> Result<(), BoxError> {
             self.saw(format!("response {}", response.id));
+
             Ok(())
         }
 
         fn event(&mut self, event: u32) -> Result<(), BoxError> {
             self.saw(format!("event {event}"));
+
             Ok(())
         }
 
         fn idle(&mut self) -> Result<(), BoxError> {
             self.saw("idle".to_string());
+
             Ok(())
         }
     }
@@ -157,6 +168,7 @@ mod tests {
     #[test]
     fn handles_everything_queued_before_it_goes_idle() {
         let (server, client) = Connection::memory();
+
         for message in [
             notification("textDocument/didChange"),
             notification("textDocument/didChange"),
@@ -165,28 +177,38 @@ mod tests {
         ] {
             client.sender.send(message).expect("sent");
         }
+
         let (_events_sender, events) = crossbeam_channel::unbounded::<u32>();
         let (echo_sender, echo) = crossbeam_channel::unbounded();
+
         let mut recorder = Recorder {
             echo: Some(echo_sender),
             ..Recorder::default()
         };
+
         let thread = std::thread::spawn(move || {
             main_loop(&server, &events, &mut recorder).expect("runs to the end");
+
             recorder.seen
         });
+
         wait_for(&echo, "idle");
         let shutdown_id = RequestId::from(2);
+
         client
             .sender
             .send(Request::new(shutdown_id.clone(), "shutdown".to_string(), Value::Null).into())
             .expect("sent");
+
         let answer = client.receiver.recv().expect("the shutdown is answered");
+
         let Message::Response(answer) = answer else {
             panic!("a response: {answer:?}");
         };
+
         assert_eq!(answer.id, shutdown_id);
         client.sender.send(notification("exit")).expect("sent");
+
         assert_eq!(
             thread.join().expect("no panic"),
             [
@@ -204,16 +226,21 @@ mod tests {
         let (server, client) = Connection::memory();
         let (sender, events) = crossbeam_channel::unbounded();
         let (echo_sender, echo) = crossbeam_channel::unbounded();
+
         let mut recorder = Recorder {
             echo: Some(echo_sender),
             ..Recorder::default()
         };
+
         sender.send(7).expect("sent");
         sender.send(8).expect("sent");
+
         let thread = std::thread::spawn(move || {
             main_loop(&server, &events, &mut recorder).expect("runs to the end");
+
             recorder.seen
         });
+
         wait_for(&echo, "idle");
         drop(client);
         assert_eq!(thread.join().expect("no panic"), ["event 7", "event 8", "idle"]);
@@ -226,18 +253,23 @@ mod tests {
         sender.send(1).expect("sent");
         drop(sender);
         let (echo_sender, echo) = crossbeam_channel::unbounded();
+
         let mut recorder = Recorder {
             echo: Some(echo_sender),
             ..Recorder::default()
         };
+
         let thread = std::thread::spawn(move || {
             main_loop(&server, &events, &mut recorder).expect("runs to the end");
+
             recorder.seen
         });
+
         wait_for(&echo, "idle");
         client.sender.send(notification("initialized")).expect("sent");
         wait_for(&echo, "idle");
         drop(client);
+
         assert_eq!(
             thread.join().expect("no panic"),
             ["event 1", "idle", "notification initialized", "idle"]
@@ -248,10 +280,12 @@ mod tests {
     fn an_error_of_the_server_ends_the_loop_with_it() {
         let (server, client) = Connection::memory();
         let (_sender, events) = crossbeam_channel::unbounded::<u32>();
+
         let mut recorder = Recorder {
             fail_on: Some("boom"),
             ..Recorder::default()
         };
+
         client.sender.send(request(1, "boom")).expect("sent");
         let result = main_loop(&server, &events, &mut recorder);
         assert_eq!(result.expect_err("an error").to_string(), "failed");

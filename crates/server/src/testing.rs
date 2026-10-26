@@ -15,6 +15,7 @@ pub struct TestClient {
     pub connection: Connection,
     pub server: Option<JoinHandle<()>>,
     pub next_id: i32,
+
     /// Notifications and requests seen while waiting for something else.
     pub backlog: Vec<Message>,
 }
@@ -27,17 +28,21 @@ impl TestClient {
         initialize: Value,
     ) -> (TestClient, Value) {
         let (server_side, client_side) = Connection::memory();
+
         let server = std::thread::spawn(move || {
             run(server_side).expect("the server runs to the end");
         });
+
         let mut client = TestClient {
             connection: client_side,
             server: Some(server),
             next_id: 0,
             backlog: Vec::new(),
         };
+
         let result = client.request("initialize", initialize);
         client.notify("initialized", json!({}));
+
         (client, result)
     }
 
@@ -71,6 +76,7 @@ impl TestClient {
         self.next_id += 1;
         let id = RequestId::from(self.next_id);
         self.send(Request::new(id.clone(), method.to_string(), params));
+
         loop {
             match self
                 .connection
@@ -88,17 +94,21 @@ impl TestClient {
     pub fn wait_for<T>(&mut self, mut pick: impl FnMut(&Message) -> Option<T>) -> T {
         if let Some(position) = self.backlog.iter().position(|message| pick(message).is_some()) {
             let message = self.backlog.remove(position);
+
             return pick(&message).expect("picked above");
         }
+
         loop {
             let message = self
                 .connection
                 .receiver
                 .recv_timeout(TIMEOUT)
                 .expect("a message arrives");
+
             if let Some(found) = pick(&message) {
                 return found;
             }
+
             self.backlog.push(message);
         }
     }
@@ -137,6 +147,7 @@ impl TestClient {
     /// kinds of the `$/progress` notifications on the way, `end` last.
     pub fn wait_for_progress_end(&mut self) -> Vec<String> {
         let mut kinds = Vec::new();
+
         loop {
             let message = self.wait_for(|message| match message {
                 Message::Request(request) if request.method == "window/workDoneProgress/create" => {
@@ -145,6 +156,7 @@ impl TestClient {
                 Message::Notification(notification) if notification.method == "$/progress" => Some(message.clone()),
                 _ => None,
             });
+
             match message {
                 Message::Request(request) => self.send(Response::new_ok(request.id, Value::Null)),
                 Message::Notification(notification) => {
@@ -152,8 +164,10 @@ impl TestClient {
                         .as_str()
                         .unwrap_or_default()
                         .to_string();
+
                     let done = kind == "end";
                     kinds.push(kind);
+
                     if done {
                         return kinds;
                     }
@@ -167,6 +181,7 @@ impl TestClient {
     pub fn shutdown(mut self) {
         self.request("shutdown", Value::Null);
         self.notify("exit", Value::Null);
+
         self.server
             .take()
             .expect("started")
@@ -209,6 +224,7 @@ mod tests {
     fn words(text: &str) -> Vec<(u32, u32)> {
         let mut found = Vec::new();
         let mut start = None;
+
         for (offset, character) in text.char_indices().chain([(text.len(), ' ')]) {
             match (start, character.is_alphanumeric()) {
                 (None, true) => start = Some(offset),
@@ -219,6 +235,7 @@ mod tests {
                 _ => {}
             }
         }
+
         found
     }
 
@@ -228,10 +245,12 @@ mod tests {
             let encoding = self.encoding;
             let document = self.documents.get_mut(&position.text_document.uri)?;
             let offset = u32::from(document.mapper(encoding).offset(position.position));
+
             let (start, end) = *document
                 .parse_with(words)
                 .iter()
                 .find(|(start, end)| (*start..=*end).contains(&offset))?;
+
             Some(Hover {
                 contents: HoverContents::Scalar(MarkedString::String(
                     document.text[start as usize..end as usize].to_string(),
@@ -249,6 +268,7 @@ mod tests {
                 HoverRequest::METHOD => answer(request.id, request.params, |params| self.hover(params)),
                 method => unsupported(request.id, method),
             };
+
             self.client.send(response)
         }
 
@@ -266,6 +286,7 @@ mod tests {
                 DidChangeTextDocument::METHOD => {
                     let params: DidChangeTextDocumentParams = serde_json::from_value(notification.params)?;
                     let uri = params.text_document.uri;
+
                     if let Some(document) = self.documents.get_mut(&uri) {
                         document.apply_changes(params.text_document.version, &params.content_changes, self.encoding);
                         self.dirty.push(uri);
@@ -274,21 +295,26 @@ mod tests {
                 "words/refresh" => self.jobs.send(REFRESH)?,
                 _ => {}
             }
+
             Ok(())
         }
 
         fn response(&mut self, response: Response) -> Result<(), BoxError> {
             self.progress.response(&self.client, &response);
+
             Ok(())
         }
 
         fn event(&mut self, files: u32) -> Result<(), BoxError> {
             if files == REFRESH {
                 self.dirty.extend(self.opened.clone());
+
                 return Ok(());
             }
+
             self.progress.job_progress(&self.client, files as usize, files as usize);
             self.progress.job_finished(&self.client);
+
             Ok(())
         }
 
@@ -297,9 +323,11 @@ mod tests {
                 let Some(document) = self.documents.get_mut(&uri) else {
                     continue;
                 };
+
                 let version = document.version;
                 let found: Vec<(u32, u32)> = document.parse_with(words).clone();
                 let mapper = document.mapper(self.encoding);
+
                 let diagnostics = found
                     .into_iter()
                     .filter(|(start, end)| &document.text[*start as usize..*end as usize] == "bad")
@@ -309,12 +337,14 @@ mod tests {
                         ..Diagnostic::default()
                     })
                     .collect();
+
                 self.client.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(
                     uri,
                     diagnostics,
                     Some(version),
                 ))?;
             }
+
             Ok(())
         }
     }
@@ -322,6 +352,7 @@ mod tests {
     fn run(connection: Connection) -> Result<(), BoxError> {
         let (id, params) = connection.initialize_start()?;
         let params: lsp_types::InitializeParams = serde_json::from_value(params)?;
+
         let encoding = crate::choose_encoding(
             params
                 .capabilities
@@ -329,6 +360,7 @@ mod tests {
                 .as_ref()
                 .and_then(|general| general.position_encodings.as_deref()),
         );
+
         let result = InitializeResult {
             capabilities: lsp_types::ServerCapabilities {
                 position_encoding: Some(crate::encoding_kind(encoding)),
@@ -336,13 +368,16 @@ mod tests {
             },
             server_info: None,
         };
+
         connection.initialize_finish(id, serde_json::to_value(result)?)?;
         let (jobs, events) = crossbeam_channel::unbounded();
+
         let supported = params
             .capabilities
             .window
             .and_then(|window| window.work_done_progress)
             .unwrap_or(false);
+
         let mut server = Words {
             client: Client::new(connection.sender.clone()),
             documents: Documents::default(),
@@ -360,6 +395,7 @@ mod tests {
             opened: None,
             jobs,
         };
+
         main_loop(&connection, &events, &mut server)
     }
 
@@ -375,6 +411,7 @@ mod tests {
             "general": { "positionEncodings": ["utf-16", "utf-8"] },
             "window": { "workDoneProgress": true }
         }));
+
         assert_eq!(result["capabilities"]["positionEncoding"], "utf-8");
         client.open_document(URI, "plaintext", "good \u{e9}t\u{e9} bad");
         let kinds = client.wait_for_progress_end();
@@ -383,6 +420,7 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0]["range"]["start"], json!({ "line": 0, "character": 11 }));
         assert_eq!(client.at("textDocument/hover", URI, 0, 7)["contents"], "\u{e9}t\u{e9}");
+
         client.notify(
             "textDocument/didChange",
             json!({
@@ -390,18 +428,22 @@ mod tests {
                 "contentChanges": [{ "range": { "start": { "line": 0, "character": 11 }, "end": { "line": 0, "character": 14 } }, "text": "fine" }]
             }),
         );
+
         assert!(client.diagnostics(URI).is_empty());
         assert_eq!(client.at("textDocument/hover", URI, 0, 13)["contents"], "fine");
+
         assert!(
             client
                 .request_error("words/count", json!({}))
                 .contains("unsupported request")
         );
+
         assert!(
             client
                 .request_error("textDocument/hover", json!({ "nonsense": 1 }))
                 .contains("missing field")
         );
+
         client.shutdown();
     }
 
@@ -425,10 +467,12 @@ mod tests {
         assert_eq!(client.at("textDocument/hover", URI, 0, 4)["contents"], "bad");
         assert_eq!(client.at("textDocument/hover", URI, 0, 2), Value::Null);
         let uri = Uri::from_str(URI).expect("a uri");
+
         assert_eq!(
             crate::paths::uri_to_path(&uri).expect("a path").to_str(),
             Some("/words.txt")
         );
+
         client.shutdown();
     }
 }

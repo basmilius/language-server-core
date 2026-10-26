@@ -22,6 +22,7 @@ pub struct Document<P, S = ()> {
 impl<P, S: Default> Document<P, S> {
     pub fn new(version: i32, text: String) -> Document<P, S> {
         let index = LineIndex::new(&text);
+
         Document {
             version,
             text,
@@ -80,6 +81,7 @@ impl<P, S> Document<P, S> {
                         },
                         encoding,
                     );
+
                     let end = self.index.offset(
                         &self.text,
                         LineCol {
@@ -88,13 +90,17 @@ impl<P, S> Document<P, S> {
                         },
                         encoding,
                     );
+
                     let (start, end) = if end < start { (end, start) } else { (start, end) };
+
                     self.text
                         .replace_range(usize::from(start)..usize::from(end), &change.text);
                 }
             }
+
             self.index = LineIndex::new(&self.text);
         }
+
         self.version = version;
         self.parsed = None;
     }
@@ -115,6 +121,7 @@ impl<P, S: Default> Documents<P, S> {
     /// Opens a document, or opens it again with this text when it was open.
     pub fn open(&mut self, uri: Uri, version: i32, text: String) -> &mut Document<P, S> {
         self.open.insert(uri.clone(), Document::new(version, text));
+
         self.open.get_mut(&uri).expect("inserted above")
     }
 }
@@ -189,11 +196,13 @@ mod tests {
     #[test]
     fn applies_incremental_changes_in_order() {
         let mut document = Plain::new(1, "<?php\n$a = 1;\n$b = 2;\n".to_string());
+
         document.apply_changes(
             2,
             &[change((1, 5), (1, 6), "42"), change((2, 0), (2, 0), "// x\n")],
             PositionEncoding::Utf16,
         );
+
         assert_eq!(document.text, "<?php\n$a = 42;\n// x\n$b = 2;\n");
         assert_eq!(document.version, 2);
     }
@@ -201,11 +210,13 @@ mod tests {
     #[test]
     fn reads_each_change_against_the_text_the_one_before_left() {
         let mut document = Plain::new(1, "ab".to_string());
+
         document.apply_changes(
             2,
             &[change((0, 2), (0, 2), "\ncd"), change((1, 2), (1, 2), "!")],
             PositionEncoding::Utf16,
         );
+
         assert_eq!(document.text, "ab\ncd!");
         assert_eq!(document.index.line_count(), 2);
     }
@@ -261,11 +272,13 @@ mod tests {
     fn invalidating_parses_the_same_text_again() {
         let mut document = Plain::new(1, "abc".to_string());
         assert_eq!(*document.parse_with(str::len), 3);
+
         assert_eq!(
             *document.parse_with(|_| 0),
             3,
             "the tree is kept until something changes"
         );
+
         document.invalidate();
         assert!(document.cached().is_none());
         assert_eq!(*document.parse_with(|_| 7), 7);
@@ -283,11 +296,13 @@ mod tests {
     #[test]
     fn a_full_change_then_an_incremental_one_reads_the_new_text() {
         let mut document = Plain::new(1, "old".to_string());
+
         document.apply_changes(
             2,
             &[whole("first\nsecond"), change((1, 0), (1, 6), "2nd")],
             PositionEncoding::Utf16,
         );
+
         assert_eq!(document.text, "first\n2nd");
     }
 
@@ -296,6 +311,7 @@ mod tests {
         let mut document = Plain::new(1, "abc".to_string());
         let mut calls = 0;
         assert_eq!(document.cached(), None);
+
         assert_eq!(
             *document.parse_with(|text| {
                 calls += 1;
@@ -303,10 +319,13 @@ mod tests {
             }),
             3
         );
+
         document.parse_with(|_| {
             calls += 1;
+
             0
         });
+
         assert_eq!(calls, 1);
         assert_eq!(document.cached(), Some(&3));
         document.apply_changes(2, &[change((0, 0), (0, 0), "xy")], PositionEncoding::Utf16);
@@ -339,10 +358,12 @@ mod tests {
         documents.open(second.clone(), 1, "two".to_string()).version = 7;
         assert_eq!(documents.len(), 2);
         assert_eq!(documents.get(&second).map(|document| document.version), Some(7));
+
         documents
             .get_mut(&first)
             .expect("open")
             .apply_changes(2, &[whole("uno")], PositionEncoding::Utf16);
+
         let texts = documents.texts();
         assert_eq!(texts.len(), 1);
         assert_eq!(texts[&PathBuf::from("/project/a b.sql")], "uno");
@@ -350,10 +371,12 @@ mod tests {
         uris.sort_by(|a, b| a.as_str().cmp(b.as_str()));
         assert_eq!(uris, [first.clone(), second.clone()]);
         assert_eq!(documents.iter().count(), 2);
+
         assert_eq!(
             documents.close(&first).map(|document| document.text),
             Some("uno".to_string())
         );
+
         assert!(documents.get(&first).is_none());
         assert!(documents.close(&first).is_none());
     }
@@ -365,6 +388,7 @@ mod tests {
         documents.open(uri.clone(), 1, "one".to_string()).state = 9;
         documents.open(uri.clone(), 3, "three".to_string());
         let document = documents.get(&uri).expect("open");
+
         assert_eq!(
             (document.version, document.text.as_str(), document.state),
             (3, "three", 0)

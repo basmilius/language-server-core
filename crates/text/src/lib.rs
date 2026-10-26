@@ -3,6 +3,7 @@
 //! can use it without the protocol.
 
 mod line_index;
+
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

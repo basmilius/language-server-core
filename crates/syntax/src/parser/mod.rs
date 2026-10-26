@@ -8,6 +8,7 @@ use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, SyntaxNode, TextR
 pub trait TokenKind: Copy + Eq {
     /// What the parser sees past the last token. Never part of a tree.
     const EOF: Self;
+
     /// The node around what the parser could not make sense of.
     const ERROR: Self;
 
@@ -93,11 +94,15 @@ pub struct Parser<'a, L: Language> {
     text: &'a str,
     tokens: Vec<Token<L::Kind>>,
     starts: Vec<u32>,
+
     /// Indexes into `tokens` of everything that is not trivia.
     significant: Vec<u32>,
+
     cursor: usize,
+
     /// The next token that goes into the tree; trivia between it and the cursor waits.
     emitted: usize,
+
     builder: GreenNodeBuilder<'static>,
     errors: Vec<SyntaxError>,
     fuel: Cell<u32>,
@@ -114,13 +119,16 @@ where
         let mut starts = Vec::with_capacity(tokens.len());
         let mut significant = Vec::with_capacity(tokens.len());
         let mut offset = 0u32;
+
         for (index, token) in tokens.iter().enumerate() {
             starts.push(offset);
             offset += token.len;
+
             if !token.kind.is_trivia() {
                 significant.push(index as u32);
             }
         }
+
         Parser {
             text,
             tokens,
@@ -157,9 +165,12 @@ where
                 self.depth += 1;
                 self.error_here("Nesting is too deep");
             }
+
             return false;
         }
+
         self.depth += 1;
+
         true
     }
 
@@ -171,10 +182,13 @@ where
 
     pub fn nth(&self, n: usize) -> L::Kind {
         let fuel = self.fuel.get();
+
         if fuel == 0 {
             return L::Kind::EOF;
         }
+
         self.fuel.set(fuel - 1);
+
         match self.significant.get(self.cursor + n) {
             Some(index) => self.tokens[*index as usize].kind,
             None => L::Kind::EOF,
@@ -208,6 +222,7 @@ where
             Some(index) => {
                 let index = *index as usize;
                 let start = self.starts[index] as usize;
+
                 &self.text[start..start + self.tokens[index].len as usize]
             }
             None => "",
@@ -265,10 +280,12 @@ where
             Some(index) => {
                 let index = *index as usize;
                 let start = self.starts[index];
+
                 TextRange::new(TextSize::from(start), TextSize::from(start + self.tokens[index].len))
             }
             None => {
                 let end = TextSize::of(self.text);
+
                 TextRange::new(end, end)
             }
         }
@@ -283,6 +300,7 @@ where
         {
             Some(index) => {
                 let index = *index as usize;
+
                 self.starts[index] + self.tokens[index].len
             }
             None => self
@@ -290,6 +308,7 @@ where
                 .get(self.cursor)
                 .map_or(self.text.len() as u32, |index| self.starts[*index as usize]),
         };
+
         TextRange::empty(TextSize::from(end))
     }
 
@@ -300,6 +319,7 @@ where
             .significant
             .get(self.cursor)
             .map_or(self.tokens.len(), |index| *index as usize);
+
         while self.emitted < until {
             self.emit(self.emitted);
             self.emitted += 1;
@@ -309,6 +329,7 @@ where
     fn emit(&mut self, index: usize) {
         let token = self.tokens[index];
         let start = self.starts[index] as usize;
+
         self.builder.token(
             L::kind_to_raw(token.kind),
             &self.text[start..start + token.len as usize],
@@ -322,18 +343,25 @@ where
             .significant
             .get(self.cursor)
             .map_or(self.tokens.len(), |index| *index as usize);
+
         let mut doc = None;
+
         for index in (self.emitted..until).rev() {
             let kind = self.tokens[index].kind;
+
             if kind.is_whitespace() {
                 continue;
             }
+
             if kind.is_doc_comment() {
                 doc = Some(index);
             }
+
             break;
         }
+
         let stop = doc.unwrap_or(until);
+
         while self.emitted < stop {
             self.emit(self.emitted);
             self.emitted += 1;
@@ -364,6 +392,7 @@ where
 
     pub fn checkpoint(&mut self) -> Checkpoint {
         self.flush_trivia();
+
         self.builder.checkpoint()
     }
 
@@ -371,6 +400,7 @@ where
     /// comment before it.
     pub fn declaration_checkpoint(&mut self) -> Checkpoint {
         self.flush_trivia_before_declaration();
+
         self.builder.checkpoint()
     }
 
@@ -383,6 +413,7 @@ where
         if self.cursor >= self.significant.len() {
             return;
         }
+
         self.flush_trivia();
         self.emit(self.emitted);
         self.emitted += 1;
@@ -396,13 +427,16 @@ where
         if self.cursor >= self.significant.len() {
             return;
         }
+
         self.flush_trivia();
         let index = self.emitted;
         let start = self.starts[index] as usize;
+
         self.builder.token(
             L::kind_to_raw(kind),
             &self.text[start..start + self.tokens[index].len as usize],
         );
+
         self.emitted += 1;
         self.cursor += 1;
         self.fuel.set(FUEL);
@@ -411,6 +445,7 @@ where
     pub fn eat(&mut self, kind: L::Kind) -> bool {
         if self.at(kind) {
             self.bump();
+
             true
         } else {
             false
@@ -422,7 +457,9 @@ where
         if self.eat(kind) {
             return true;
         }
+
         self.error_expected(what);
+
         false
     }
 
@@ -446,6 +483,7 @@ where
     /// Reports `what` missing right after the previous token, as `{what} expected`.
     pub fn error_expected(&mut self, what: &str) {
         let range = self.after_previous_range();
+
         self.errors.push(SyntaxError {
             range,
             message: format!("{what} expected"),
@@ -454,6 +492,7 @@ where
 
     pub fn error_here(&mut self, message: impl Into<String>) {
         let range = self.current_range();
+
         self.errors.push(SyntaxError {
             range,
             message: message.into(),
@@ -465,6 +504,7 @@ where
         if self.current() == L::Kind::EOF {
             return;
         }
+
         let message = format!("Unexpected '{}'", self.current_text().escape_debug());
         self.error_here(message);
         self.start(L::Kind::ERROR);
@@ -477,12 +517,15 @@ where
         if self.eof() {
             return;
         }
+
         self.error_here(format!("Unexpected '{}'", self.current_text().escape_debug()));
         self.start(L::Kind::ERROR);
         self.bump();
+
         while !self.eof() && !stop.contains(&self.current()) {
             self.bump();
         }
+
         self.finish_node();
     }
 }

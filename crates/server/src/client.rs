@@ -20,12 +20,14 @@ impl Client {
 
     pub fn send(&self, message: impl Into<Message>) -> Result<(), BoxError> {
         self.sender.send(message.into())?;
+
         Ok(())
     }
 
     /// An id no request of this server used before, counting up from 1.
     pub fn next_id(&mut self) -> RequestId {
         self.last_id += 1;
+
         RequestId::from(self.last_id)
     }
 
@@ -33,6 +35,7 @@ impl Client {
     pub fn request<R: lsp_types::request::Request>(&mut self, params: R::Params) -> Result<RequestId, BoxError> {
         let id = self.next_id();
         self.send(Request::new(id.clone(), R::METHOD.to_string(), params))?;
+
         Ok(id)
     }
 
@@ -62,6 +65,7 @@ mod tests {
     fn numbers_requests_from_one() {
         let (sender, receiver) = crossbeam_channel::unbounded();
         let mut client = Client::new(sender);
+
         let first = client
             .request::<WorkspaceConfiguration>(ConfigurationParams {
                 items: vec![ConfigurationItem {
@@ -70,17 +74,22 @@ mod tests {
                 }],
             })
             .expect("sent");
+
         let second = client.request::<SemanticTokensRefresh>(()).expect("sent");
         assert_eq!(client.next_id(), RequestId::from(3));
         assert_eq!((first, second), (RequestId::from(1), RequestId::from(2)));
+
         let Ok(Message::Request(request)) = receiver.try_recv() else {
             panic!("a request");
         };
+
         assert_eq!(request.method, "workspace/configuration");
         assert_eq!(request.params, json!({ "items": [{ "section": "sql" }] }));
+
         let Ok(Message::Request(request)) = receiver.try_recv() else {
             panic!("a request");
         };
+
         assert_eq!(
             (request.method.as_str(), request.params),
             ("workspace/semanticTokens/refresh", json!(null))
@@ -92,14 +101,18 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::unbounded();
         let client = Client::new(sender);
         let uri = Uri::from_str("file:///a.sql").expect("a uri");
+
         client
             .notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(uri, Vec::new(), Some(4)))
             .expect("sent");
+
         client.log(MessageType::INFO, "hello".to_string());
         let messages: Vec<Message> = receiver.try_iter().collect();
+
         let [Message::Notification(diagnostics), Message::Notification(log)] = &messages[..] else {
             panic!("two notifications: {messages:?}");
         };
+
         assert_eq!(diagnostics.method, "textDocument/publishDiagnostics");
         assert_eq!(diagnostics.params["version"], 4);
         assert_eq!(log.method, "window/logMessage");

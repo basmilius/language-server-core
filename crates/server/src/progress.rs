@@ -16,10 +16,13 @@ use crate::client::Client;
 pub struct ProgressLabels {
     /// The prefix of every token, followed by `/` and a counter.
     pub token: String,
+
     /// The title the client shows, such as `Indexing files`.
     pub title: String,
+
     /// What the work counts, in a report of `3 of 10 files`.
     pub unit: String,
+
     /// The message the progress ends with.
     pub done: String,
 }
@@ -31,8 +34,10 @@ pub struct Progress {
     labels: ProgressLabels,
     counter: u32,
     token: Option<String>,
+
     /// The client answered `window/workDoneProgress/create` and the report has begun.
     begun: bool,
+
     create_request: Option<RequestId>,
     running_jobs: usize,
     total: usize,
@@ -64,6 +69,7 @@ impl Progress {
 
     pub fn job_started(&mut self, client: &mut Client) {
         self.running_jobs += 1;
+
         if self.supported && self.token.is_none() {
             self.counter += 1;
             let token = format!("{}/{}", self.labels.token, self.counter);
@@ -71,6 +77,7 @@ impl Progress {
             self.token = Some(token.clone());
             self.begun = false;
             self.create_request = Some(id.clone());
+
             let _ = client.send(lsp_server::Request::new(
                 id,
                 <WorkDoneProgressCreate as lsp_types::request::Request>::METHOD.to_string(),
@@ -87,8 +94,10 @@ impl Progress {
         self.total += discovered;
         self.done += done;
         let percent = self.percent();
+
         if self.begun && percent != self.last_percent {
             self.last_percent = percent;
+
             self.send(
                 client,
                 WorkDoneProgress::Report(WorkDoneProgressReport {
@@ -102,10 +111,12 @@ impl Progress {
 
     pub fn job_finished(&mut self, client: &Client) {
         self.running_jobs = self.running_jobs.saturating_sub(1);
+
         // While the client has not answered the request to create the progress, its answer ends it.
         if self.running_jobs > 0 || self.create_request.is_some() {
             return;
         }
+
         if self.begun {
             self.send(
                 client,
@@ -114,6 +125,7 @@ impl Progress {
                 }),
             );
         }
+
         self.token = None;
         self.begun = false;
         self.total = 0;
@@ -127,13 +139,18 @@ impl Progress {
         if self.create_request.as_ref() != Some(&response.id) {
             return false;
         }
+
         self.create_request = None;
+
         if response.response_result.is_err() {
             self.token = None;
+
             return true;
         }
+
         self.begun = true;
         self.last_percent = self.percent();
+
         self.send(
             client,
             WorkDoneProgress::Begin(WorkDoneProgressBegin {
@@ -143,6 +160,7 @@ impl Progress {
                 percentage: Some(self.last_percent),
             }),
         );
+
         // The work was done before the client answered: report it as done right away.
         if self.running_jobs == 0 {
             self.send(
@@ -151,9 +169,11 @@ impl Progress {
                     message: Some(self.labels.done.clone()),
                 }),
             );
+
             self.token = None;
             self.begun = false;
         }
+
         true
     }
 
@@ -161,6 +181,7 @@ impl Progress {
         if self.total == 0 {
             return 0;
         }
+
         ((self.done * 100) / self.total).min(100) as u32
     }
 
@@ -168,6 +189,7 @@ impl Progress {
         let Some(token) = &self.token else {
             return;
         };
+
         let _ = client.notify::<ProgressNotification>(ProgressParams {
             token: NumberOrString::String(token.clone()),
             value: ProgressParamsValue::WorkDone(value),
@@ -193,6 +215,7 @@ mod tests {
 
     fn setup(supported: bool) -> (Progress, Client, Receiver<Message>) {
         let (sender, receiver) = crossbeam_channel::unbounded();
+
         (Progress::new(supported, labels()), Client::new(sender), receiver)
     }
 
@@ -203,6 +226,7 @@ mod tests {
             .map(|message| match message {
                 Message::Request(request) => {
                     assert_eq!(request.method, "window/workDoneProgress/create");
+
                     format!(
                         "create {} as {}",
                         request.params["token"].as_str().unwrap_or(""),
@@ -213,11 +237,13 @@ mod tests {
                     assert_eq!(notification.method, "$/progress");
                     let value = &notification.params["value"];
                     let mut line = value["kind"].as_str().unwrap_or("").to_string();
+
                     for key in ["title", "message", "percentage"] {
                         if let Some(field) = value.get(key) {
                             line.push_str(&format!(" {key}={}", field_text(field)));
                         }
                     }
+
                     line
                 }
                 Message::Response(_) => panic!("the server sends no responses here"),
@@ -240,16 +266,19 @@ mod tests {
         progress.job_started(&mut client);
         assert_eq!(sent(&receiver), ["create sql-language-server/indexing/1 as 1"]);
         progress.job_progress(&client, 0, 4);
+
         assert!(
             sent(&receiver).is_empty(),
             "nothing is reported before the progress began"
         );
+
         assert!(progress.response(&client, &ok(1)));
         progress.job_progress(&client, 1, 0);
         progress.job_progress(&client, 0, 0);
         progress.job_finished(&client);
         progress.job_progress(&client, 3, 0);
         progress.job_finished(&client);
+
         assert_eq!(
             sent(&receiver),
             [
@@ -259,6 +288,7 @@ mod tests {
                 "end message=Indexed",
             ]
         );
+
         assert_eq!(progress.running_jobs(), 0);
     }
 
@@ -270,6 +300,7 @@ mod tests {
         progress.job_finished(&client);
         progress.job_started(&mut client);
         let sent = sent(&receiver);
+
         assert_eq!(
             sent.last().map(String::as_str),
             Some("create sql-language-server/indexing/2 as 2")
@@ -284,6 +315,7 @@ mod tests {
         progress.job_finished(&client);
         assert_eq!(sent(&receiver), ["create sql-language-server/indexing/1 as 1"]);
         assert!(progress.response(&client, &ok(1)));
+
         assert_eq!(
             sent(&receiver),
             ["begin title=Indexing SQL files percentage=100", "end message=Indexed"]

@@ -40,33 +40,42 @@ pub fn run_stdio(
         Command::Serve => {}
         Command::Print(text) => {
             println!("{text}");
+
             return ExitCode::SUCCESS;
         }
         Command::Refuse(text) => {
             eprintln!("{text}");
+
             return ExitCode::from(2);
         }
     }
+
     let (connection, threads) = Connection::stdio();
+
     let worker = std::thread::Builder::new()
         .name(name.to_string())
         .stack_size(STACK_SIZE)
         .spawn(move || run(connection));
+
     let result = match worker {
         Ok(handle) => handle
             .join()
             .unwrap_or_else(|_| Err("the server thread panicked".into())),
         Err(error) => Err(error.to_string().into()),
     };
+
     let io_result = threads.join();
+
     match (result, io_result) {
         (Ok(()), Ok(())) => ExitCode::SUCCESS,
         (Err(error), _) => {
             eprintln!("{name}: {error}");
+
             ExitCode::FAILURE
         }
         (_, Err(error)) => {
             eprintln!("{name}: {error}");
+
             ExitCode::FAILURE
         }
     }
