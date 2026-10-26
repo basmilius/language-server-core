@@ -272,7 +272,6 @@ mod tests {
     fn invalidating_parses_the_same_text_again() {
         let mut document = Plain::new(1, "abc".to_string());
         assert_eq!(*document.parse_with(str::len), 3);
-
         assert_eq!(
             *document.parse_with(|_| 0),
             3,
@@ -311,7 +310,6 @@ mod tests {
         let mut document = Plain::new(1, "abc".to_string());
         let mut calls = 0;
         assert_eq!(document.cached(), None);
-
         assert_eq!(
             *document.parse_with(|text| {
                 calls += 1;
@@ -371,12 +369,10 @@ mod tests {
         uris.sort_by(|a, b| a.as_str().cmp(b.as_str()));
         assert_eq!(uris, [first.clone(), second.clone()]);
         assert_eq!(documents.iter().count(), 2);
-
         assert_eq!(
             documents.close(&first).map(|document| document.text),
             Some("uno".to_string())
         );
-
         assert!(documents.get(&first).is_none());
         assert!(documents.close(&first).is_none());
     }

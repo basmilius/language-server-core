@@ -431,13 +431,11 @@ mod tests {
 
         assert!(client.diagnostics(URI).is_empty());
         assert_eq!(client.at("textDocument/hover", URI, 0, 13)["contents"], "fine");
-
         assert!(
             client
                 .request_error("words/count", json!({}))
                 .contains("unsupported request")
         );
-
         assert!(
             client
                 .request_error("textDocument/hover", json!({ "nonsense": 1 }))

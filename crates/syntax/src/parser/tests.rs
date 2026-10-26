@@ -258,7 +258,6 @@ fn builds_a_tree_with_trivia_between_nodes() {
         render(&parse),
         r#"(ROOT "  " (LET "let" " " "a" " " "=" " " (BINARY (LITERAL "1") " " "+" " " (PAREN "(" (LITERAL "b") ")")) " " ";"))"#
     );
-
     assert!(parse.errors().is_empty());
 }
 
@@ -325,7 +324,6 @@ fn a_missing_token_at_the_start_is_reported_before_the_first_token() {
 fn recovers_by_wrapping_what_it_cannot_read_in_error_nodes() {
     let parse = parse("1 + ) let a = 1;");
     assert_eq!(errors(&parse), [(0, 1, "Unexpected '1'")]);
-
     assert_eq!(
         render(&parse),
         r#"(ROOT (ERROR "1" " " "+" " " ")") " " (LET "let" " " "a" " " "=" " " (LITERAL "1") ";"))"#

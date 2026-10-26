@@ -128,7 +128,6 @@ mod tests {
             uri_to_path(&uri("file://server/share/x.php")).expect("a path"),
             PathBuf::from("/share/x.php")
         );
-
         assert_eq!(uri_to_path(&uri("file://server")).expect("a path"), PathBuf::from(""));
     }
 

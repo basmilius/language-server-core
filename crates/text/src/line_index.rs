@@ -4,8 +4,10 @@ use text_size::{TextRange, TextSize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum PositionEncoding {
     Utf8,
+
     #[default]
     Utf16,
+
     Utf32,
 }
 
@@ -229,7 +231,6 @@ mod tests {
             index.line_col(text, TextSize::from(3), PositionEncoding::Utf16),
             at(0, 3)
         );
-
         assert_eq!(index.line_of(3), 0);
         assert_eq!(index.line_of(4), 1);
     }
@@ -239,12 +240,10 @@ mod tests {
         let text = "a\rb\r\nc";
         let index = LineIndex::new(text);
         assert_eq!(index.line_count(), 3);
-
         assert_eq!(
             index.line_col(text, offset_of(text, "b"), PositionEncoding::Utf16),
             at(1, 0)
         );
-
         assert_eq!(
             index.offset(text, at(2, 0), PositionEncoding::Utf16),
             offset_of(text, "c")
@@ -260,14 +259,11 @@ mod tests {
             index.offset(text, at(0, 99), PositionEncoding::Utf16),
             TextSize::from(2)
         );
-
         assert_eq!(index.offset(text, at(9, 0), PositionEncoding::Utf16), TextSize::from(5));
-
         assert_eq!(
             index.offset(text, at(1, 99), PositionEncoding::Utf16),
             TextSize::from(5)
         );
-
         assert_eq!(
             index.line_col(text, TextSize::from(99), PositionEncoding::Utf16),
             at(1, 2)
@@ -279,12 +275,10 @@ mod tests {
         let text = "a\n";
         let index = LineIndex::new(text);
         assert_eq!(index.line_count(), 2);
-
         assert_eq!(
             index.line_col(text, TextSize::from(2), PositionEncoding::Utf16),
             at(1, 0)
         );
-
         assert_eq!(index.offset(text, at(1, 0), PositionEncoding::Utf16), TextSize::from(2));
     }
 

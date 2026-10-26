@@ -70,7 +70,6 @@ mod tests {
         });
 
         assert_eq!(response.id, RequestId::from(7));
-
         assert_eq!(
             response.response_result.expect("a result"),
             json!({ "line": 1, "character": 2 })

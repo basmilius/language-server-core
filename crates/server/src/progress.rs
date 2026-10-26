@@ -271,7 +271,6 @@ mod tests {
             sent(&receiver).is_empty(),
             "nothing is reported before the progress began"
         );
-
         assert!(progress.response(&client, &ok(1)));
         progress.job_progress(&client, 1, 0);
         progress.job_progress(&client, 0, 0);
@@ -288,7 +287,6 @@ mod tests {
                 "end message=Indexed",
             ]
         );
-
         assert_eq!(progress.running_jobs(), 0);
     }
 
@@ -315,7 +313,6 @@ mod tests {
         progress.job_finished(&client);
         assert_eq!(sent(&receiver), ["create sql-language-server/indexing/1 as 1"]);
         assert!(progress.response(&client, &ok(1)));
-
         assert_eq!(
             sent(&receiver),
             ["begin title=Indexing SQL files percentage=100", "end message=Indexed"]

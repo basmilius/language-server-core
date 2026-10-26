@@ -107,27 +107,22 @@ mod tests {
     fn picks_utf8_when_offered_and_utf16_otherwise() {
         assert_eq!(choose_encoding(None), PositionEncoding::Utf16);
         assert_eq!(choose_encoding(Some(&[])), PositionEncoding::Utf16);
-
         assert_eq!(
             choose_encoding(Some(&[PositionEncodingKind::UTF16])),
             PositionEncoding::Utf16
         );
-
         assert_eq!(
             choose_encoding(Some(&[PositionEncodingKind::UTF16, PositionEncodingKind::UTF8])),
             PositionEncoding::Utf8
         );
-
         assert_eq!(
             choose_encoding(Some(&[PositionEncodingKind::UTF32])),
             PositionEncoding::Utf32
         );
-
         assert_eq!(
             choose_encoding(Some(&[PositionEncodingKind::UTF32, PositionEncodingKind::UTF8])),
             PositionEncoding::Utf8
         );
-
         assert_eq!(
             choose_encoding(Some(&[PositionEncodingKind::new("utf-7")])),
             PositionEncoding::Utf16
