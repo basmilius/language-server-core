@@ -467,8 +467,8 @@ mod tests {
         let uri = Uri::from_str(URI).expect("a uri");
 
         assert_eq!(
-            crate::paths::uri_to_path(&uri).expect("a path").to_str(),
-            Some("/words.txt")
+            crate::paths::uri_to_path(&uri).expect("a path"),
+            std::path::Path::new("/words.txt")
         );
 
         client.shutdown();
