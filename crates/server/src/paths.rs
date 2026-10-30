@@ -13,17 +13,32 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     let path = rest.find('/').map_or("", |index| &rest[index..]);
     let decoded = percent_decode(path)?;
 
-    Some(PathBuf::from(decoded))
+    Some(PathBuf::from(native_path(decoded)))
+}
+
+/// What a decoded URI path is on this platform: on Windows `/C:/x` is `C:\x`.
+fn native_path(decoded: String) -> String {
+    if !cfg!(windows) {
+        return decoded;
+    }
+
+    let bytes = decoded.as_bytes();
+    let drive = bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':';
+    let path = if drive { &decoded[1..] } else { &decoded[..] };
+
+    path.replace('/', "\\")
 }
 
 /// The `file:` URI of an absolute path, with every byte outside the unreserved characters, `/`
 /// and the sub-delimiters percent-encoded. `None` for a path that is no UTF-8.
 pub fn path_to_uri(path: &Path) -> Option<Uri> {
-    let text = path.to_str()?;
+    let text = uri_path(path.to_str()?);
     let mut out = String::from("file://");
 
-    for byte in text.bytes() {
+    for (index, byte) in text.bytes().enumerate() {
         match byte {
+            // The colon of a drive stays as it is: `/C:/x`.
+            b':' if cfg!(windows) && index == 2 => out.push(':'),
             b'A'..=b'Z'
             | b'a'..=b'z'
             | b'0'..=b'9'
@@ -51,6 +66,21 @@ pub fn path_to_uri(path: &Path) -> Option<Uri> {
     }
 
     Uri::from_str(&out).ok()
+}
+
+/// The path part of a URI: on Windows `C:\x` is `/C:/x`.
+fn uri_path(path: &str) -> String {
+    if !cfg!(windows) {
+        return path.to_string();
+    }
+
+    let slashed = path.replace('\\', "/");
+
+    if slashed.starts_with('/') {
+        slashed
+    } else {
+        format!("/{slashed}")
+    }
 }
 
 fn percent_decode(text: &str) -> Option<String> {
@@ -132,10 +162,27 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn a_windows_drive_stays_after_the_slash() {
         assert_eq!(
             uri_to_path(&uri("file:///C:/Users/x.php")).expect("a path"),
             PathBuf::from("/C:/Users/x.php")
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn a_windows_path_is_a_drive_and_back() {
+        let path = uri_to_path(&uri("file:///C:/Users/My%20Project/x.php")).expect("a path");
+
+        assert_eq!(path.to_str(), Some(r"C:\Users\My Project\x.php"));
+        assert_eq!(
+            path_to_uri(&path).expect("a uri").as_str(),
+            "file:///C:/Users/My%20Project/x.php"
+        );
+        assert_eq!(
+            uri_to_path(&uri("file:///c%3A/x.php")).expect("a path").to_str(),
+            Some(r"c:\x.php")
         );
     }
 
