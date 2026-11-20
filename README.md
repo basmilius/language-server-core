@@ -3,7 +3,7 @@
     <img src=".github/logo-light.svg" alt="language-server-core" height="48" />
 </picture>
 
-# language-server-core
+# Language Server: Core
 
 The shared foundation of the language servers of `basmilius/language-server-*`, in Rust: what every one of them does the same way, so that a server holds only what its language means. It is not on crates.io; a server depends on it through Git, pinned to a tag.
 
